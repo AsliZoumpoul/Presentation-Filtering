@@ -1,0 +1,416 @@
+using System;
+using Syncfusion.Presentation;
+using System.Collections.Generic;
+using System.Linq;
+using System.Windows.Forms;
+using System.IO;
+using System.Drawing;
+using PowerPoint = Microsoft.Office.Interop.PowerPoint;
+using Microsoft.Office.Core;
+
+namespace PowerpointFilter
+{
+    public partial class Form1 : Form
+    {
+        string[] files;
+        List<string> slidehashtags = new List<string>();
+        string hashtag;
+        string[] multihashtags;
+        string[] words;
+        bool hashtaglistempty = true;
+        bool exists = true;
+        IPresentation file;
+        bool nextslide = false;
+        int counthash = 0;
+        int counthashtag = 0;
+        string outputfile;
+        List<string> selectedhashtags = new List<string>();
+        string filename;
+        List<string> searchedhashtags = new List<string>();
+        bool contains = true;
+        bool found = false;
+        string path;
+
+        public Form1()
+        {
+            InitializeComponent();
+            ShowFiles();
+        }
+
+        private void ShowFiles()
+        {
+            try
+            {
+                files = Directory.GetFiles("V:\\AslıZoumpoul\\nf", "*.pptx");
+                if (files.Length == 0)
+                {
+                    MessageBox.Show("There are no powerpoint files in this folder!");
+                    return;
+                }
+                foreach (string path in files)
+                {
+                    filename = Path.GetFileName(path);
+                    list_files.Items.Add(filename);
+                    file = Presentation.Open(path);
+                    //    Retrieves the slide instance.
+                    foreach (ISlide slide in file.Slides.ToList())
+                    {
+                        //Retrieves the first paragraph of the shape
+                        foreach (IParagraph paragraph in slide.NotesSlide.NotesTextBody.Paragraphs)
+                        {
+                            if (paragraph.Text != null && paragraph.Text.Contains("#"))
+                            {
+                                words = paragraph.Text.Split(' ');
+                                foreach (string word in words) if (word.Equals(" ") == false && word.Contains("#")) slidehashtags.Add(word.ToUpper());
+                            }
+                        }
+                        if (slidehashtags != null)
+                        {
+                            foreach (string hash in slidehashtags) hashtag = String.Concat(hashtag, hash + " ");
+                        }
+                        slidehashtags.Clear();
+                        if (hashtag != null)
+                        {
+                            if (hashtaglistempty)
+                            {
+                                list_hashtags.Items.Add(hashtag);
+                                hashtaglistempty = false;
+                            }
+                            else
+                            {
+                                for (int i = 0; i < list_hashtags.Items.Count; i++)
+                                {
+                                    if (list_hashtags.Items[i].Equals(hashtag) == false) exists = false;
+                                    else
+                                    {
+                                        exists = true;
+                                        break;
+                                    }
+                                }
+                                if (exists == false) list_hashtags.Items.Add(hashtag);
+                            }
+                        }
+                        hashtag = "";
+                    }
+                    file.Close();
+                }
+                foreach (var hashtag in list_hashtags.Items)
+                {
+                    searchedhashtags.Add(hashtag.ToString());
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+        private void btn_getppt_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                if (txt_filename.Text.Equals("") || txt_filename.Text.Contains(" "))
+                {
+                    MessageBox.Show("Please, enter a valid file name!");
+                    return;
+                }
+                if (selectedhashtags.Count == 0)
+                {
+                    MessageBox.Show("Please, select at least one tag!");
+                    return;
+                }
+                IPresentation destinationfile = Presentation.Create();
+                //Opens an existing presentation.
+                foreach (string currenthashtag in selectedhashtags)
+                {
+                    if (currenthashtag.Contains(" #"))
+                    {
+                        multihashtags = currenthashtag.Trim().Split(' ');
+                        foreach (string filename in files)
+                        {
+                            file = Presentation.Open(filename);
+                            //    Retrieves the slide instance.
+                            foreach (ISlide slide in file.Slides.ToList())
+                            {
+                                //Retrieves the first paragraph of the shape
+                                foreach (IParagraph paragraph in slide.NotesSlide.NotesTextBody.Paragraphs)
+                                {
+                                    if (paragraph.Text != null && paragraph.Text.Contains("#"))
+                                    {
+                                        words = paragraph.Text.Split(' ');
+                                        foreach (string word in words)
+                                        {
+                                            if (word.Contains("#")) counthash++;
+                                        }
+                                    }
+                                }
+                                if (counthash == multihashtags.Length)
+                                {
+                                    foreach (string hashtag in multihashtags)
+                                    {
+                                        foreach (IParagraph paragraph in slide.NotesSlide.NotesTextBody.Paragraphs)
+                                        {
+                                            if (paragraph.Text != null && paragraph.Text.Contains("#"))
+                                            {
+                                                words = paragraph.Text.Split(' ');
+                                                foreach (string word in words)
+                                                {
+                                                    if (word.ToUpper().Trim().Equals(hashtag.Trim())) counthashtag++;
+                                                    if (counthashtag == multihashtags.Length)
+                                                    {
+                                                        ISlide clonedSlide = slide.Clone();
+                                                        destinationfile.Slides.Add(clonedSlide, PasteOptions.SourceFormatting, file);
+                                                        nextslide = true;
+                                                        counthashtag = 0;
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            if (nextslide) break;
+                                        }
+                                    }
+                                }
+                                counthashtag = 0;
+                                counthash = 0;
+                                nextslide = false;
+                            }
+                            file.Close();
+                        }
+                    }
+                    else
+                    {
+                        foreach (string filename in files)
+                        {
+                            file = Presentation.Open(filename);
+                            //    Retrieves the slide instance.
+                            foreach (ISlide slide in file.Slides.ToList())
+                            {
+                                //Retrieves the first paragraph of the shape
+                                foreach (IParagraph paragraph in slide.NotesSlide.NotesTextBody.Paragraphs)
+                                {
+                                    if (paragraph.Text != null && paragraph.Text.Contains("#"))
+                                    {
+                                        words = paragraph.Text.Split(' ');
+                                        foreach (string word in words)
+                                        {
+                                            if (word.Contains("#")) counthashtag++;
+                                        }
+                                    }
+                                }
+                                if (counthashtag == 1)
+                                {
+                                    foreach (IParagraph paragraph in slide.NotesSlide.NotesTextBody.Paragraphs)
+                                    {
+                                        if (paragraph.Text != null && paragraph.Text.Contains("#"))
+                                        {
+                                            words = paragraph.Text.Split(' ');
+                                            foreach (string word in words)
+                                            {
+                                                if (word.ToUpper().Trim().Equals(currenthashtag.Trim()))
+                                                {
+                                                    ISlide clonedSlide = slide.Clone();
+                                                    destinationfile.Slides.Add(clonedSlide, PasteOptions.SourceFormatting, file);
+                                                    nextslide = true;
+                                                    break;
+                                                }
+                                                if (nextslide) break;
+                                            }
+                                        }
+                                        if (nextslide) break;
+                                    }
+                                }
+                                counthashtag = 0;
+                                nextslide = false;   
+                            }
+                            file.Close();
+                        }
+                    }
+                }
+                FileStream outputfile = File.Create("V:\\SiskonSunum\\Output.pptx");
+                destinationfile.Save(outputfile);
+                outputfile.Close();
+                ClearLogo();
+                MessageBox.Show("Powerpoint created!");
+                
+                
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+        private void ClearLogo()
+        {
+            PowerPoint.Application pptApp = new PowerPoint.Application();
+            PowerPoint.Presentations pptPresentations = pptApp.Presentations;
+            FolderBrowserDialog choofdlog = new FolderBrowserDialog();
+            DialogResult result = choofdlog.ShowDialog();
+            outputfile = choofdlog.SelectedPath;
+            path = outputfile + @"\\" + txt_filename.Text + ".pptx";
+            FileStream fs = File.Create(path);
+            fs.Close();
+            PowerPoint.Presentation pptPresentation = pptPresentations.Open("V:\\SiskonSunum\\Output.pptx", MsoTriState.msoTrue, MsoTriState.msoFalse, MsoTriState.msoFalse);
+            PowerPoint.Slides pptSlides = pptPresentation.Slides;
+            if (pptSlides != null)
+            {
+                foreach (PowerPoint.Slide slide in pptSlides)
+                {
+                    foreach (PowerPoint.Shape textShape in slide.Shapes)
+                    {
+                        if (textShape.HasTextFrame == MsoTriState.msoTrue && textShape.TextFrame.HasText == MsoTriState.msoTrue)
+                        {
+                            PowerPoint.TextRange pptTextRange = textShape.TextFrame.TextRange;
+                            if (pptTextRange != null && pptTextRange.Text.Equals("Created with a trial version of Syncfusion Essential Presentation")) pptTextRange.Delete();
+
+                        }
+                    }
+                }
+            }
+            pptPresentation.SaveAs(path,
+            PowerPoint.PpSaveAsFileType.ppSaveAsDefault, MsoTriState.msoTrue);
+            File.Delete("V:\\SiskonSunum\\Output.pptx");
+            pptPresentation.Close();
+        }
+        private void Txt_search_TextChanged(object sender, EventArgs e)
+        {
+            try
+            {
+                foreach (string hashtag in list_hashtags.CheckedItems)
+                {
+                    if (selectedhashtags.Contains(hashtag) == false) selectedhashtags.Add(hashtag);
+                }
+                list_hashtags.Items.Clear();
+                foreach (string hashtag in searchedhashtags)
+                {
+                    if (hashtag.StartsWith(txt_search.Text, StringComparison.CurrentCultureIgnoreCase))
+                        list_hashtags.Items.Add(hashtag);
+                }
+                for (int i = 0; i < list_hashtags.Items.Count; i++)
+                {
+                    foreach (string hashtag in selectedhashtags)
+                    {
+                        if (list_hashtags.Items[i].ToString() == hashtag) list_hashtags.SetItemChecked(i, true);
+                    }
+                }
+                    
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+        private void list_hashtags_ItemCheck(object sender, ItemCheckEventArgs e)
+        {
+            try
+            {
+                foreach (string selectedhashtag in list_hashtags.SelectedItems)
+                {
+                    if (list_hashtags.CheckedItems.Count != 0)
+                    {
+                        foreach (string checkedhashtag in list_hashtags.CheckedItems)
+                        {
+                            if (checkedhashtag.Equals(selectedhashtag))
+                            {
+                                selectedhashtags.Remove(selectedhashtag);
+                                list_selectedhashtags.Items.Remove(selectedhashtag);
+                                contains = true;
+                                break;
+                            }
+                            else contains = false;
+                        }
+                        if (contains == false)
+                        {
+                            selectedhashtags.Add(selectedhashtag);
+                            list_selectedhashtags.Items.Add(selectedhashtag);
+                        }
+                    }
+                    else
+                    {
+                        selectedhashtags.Add(selectedhashtag);
+                        list_selectedhashtags.Items.Add(selectedhashtag);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+        private void Btn_refresh_Click(object sender, EventArgs e)
+        {
+            try
+            {
+                list_files.Items.Clear();
+                list_hashtags.Items.Clear();
+                searchedhashtags.Clear();
+                selectedhashtags.Clear();
+                list_selectedhashtags.Items.Clear();
+                hashtaglistempty = true;
+                exists = true;
+                ShowFiles();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+        private void list_files_MouseDown(object sender, MouseEventArgs e)
+        {
+            try
+            {
+                if (this.list_files.SelectedItem == null) return;
+                this.list_files.DoDragDrop(this.list_files.SelectedItem, DragDropEffects.Move);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void list_files_DragOver(object sender, DragEventArgs e)
+        {
+            try
+            {
+                e.Effect = DragDropEffects.Move;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void list_files_DragDrop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                Point point = list_files.PointToClient(new Point(e.X, e.Y));
+                int index = this.list_files.IndexFromPoint(point);
+                if (index < 0) index = this.list_files.Items.Count - 1;
+                object data = list_files.SelectedItem;
+                this.list_files.Items.Remove(data);
+                this.list_files.Items.Insert(index, data);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.Message);
+            }
+        }
+
+        private void Btn_clear_Click(object sender, EventArgs e)
+        {
+            
+            while (list_hashtags.CheckedIndices.Count > 0)
+            {
+                list_hashtags.SetItemChecked(list_hashtags.CheckedIndices[0], false);
+            }
+            selectedhashtags.Clear();
+            list_selectedhashtags.Items.Clear();
+            hashtaglistempty = true;
+            exists = true;
+        }
+    }
+}
+
+
+
+
+
